@@ -15,17 +15,22 @@ import org.identityconnectors.framework.common.objects.SearchResult
 import org.identityconnectors.framework.common.objects.filter.EqualsFilter
 import org.identityconnectors.framework.common.objects.filter.Filter
 import org.identityconnectors.framework.common.objects.filter.OrFilter
-import org.tampagen.Affiliations
-import org.tampagen.Facilities
+
 import org.tampagen.Licenses
 import org.tampagen.utils.CStreamConstants
 import org.tampagen.utils.DemographicSchema
+import org.tampagen.Affiliations
+import org.tampagen.Facilities
+import org.tampagen.Licenses
+import org.tampagen.ApprovedAssociates
+import org.tampagen.Specialities
+import org.tampagen.OfficeLocations
 
 import java.nio.charset.StandardCharsets
 
 // Configuration
-apiKey = "<API KEY>"
-requesterId = "<REQUESTER ID>"
+apiKey = "<API Key>"
+requesterId = "<REQUESTER _ID>"
 requesterSecret = "<SECRET>"
 resource = "<RESOURCE>"
 
@@ -63,6 +68,7 @@ switch (objectClass.objectClassValue)  {
                     drId = ((EqualsFilter) filter).getAttribute().getValue().get(0)
                 }
                 println "Filtering by Dr_Id: " + drId
+                // Ensure we have a valid JWT token before making the API call
                 ensureJwtToken()
                 def filterNode = objectMapper.createObjectNode()
                 filterNode.put("Dr_Id", drId)
@@ -112,6 +118,56 @@ switch (objectClass.objectClassValue)  {
                                 // Check for existence of the field and convert to text; default to an empty string
                                 providerData[attributeName] = provider.has(attributeName) ? provider.get(attributeName).asText() : ""
                             }
+                            def title = providerData["PrimaryTitles_Code"] ?: "NA"
+                            def dr_Id = providerData["Dr_Id"] ?: "NA"
+                            println "Processing Dr_Id: " + dr_Id + ", Title: " + title
+                            // Get affiliations, licenses, facilities, associates
+                            def associates = []
+                            if(title == "PA"){
+                                try {
+                                    associates = getAssociates(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                } catch (Exception e){
+                                        println "   Warning: Could not retrieve associates for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                }
+                            }
+                            // Get licenses for this provider
+                            def licenses = []
+                            if (dr_Id && dr_Id != "NA") {
+                                try {
+                                    licenses = getLicenses(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                } catch (Exception e) {
+                                    println "   Warning: Could not retrieve licenses for Dr_Id ${dr_Id}: ${e.getMessage()}"                        
+                                }
+                            }
+                            // Get facilities for this provider
+                            def facilities = []
+                            if (dr_Id && dr_Id != "NA") {
+                                try {
+                                    facilities = getFacilities(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                } catch (Exception e) {
+                                    println "   Warning: Could not retrieve facilities for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                }
+                            }
+                            // Get specialities for this provider
+                            def specialities = []
+                            if (dr_Id && dr_Id != "NA") {
+                                try {
+                                    specialities = getSpecialities(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                } catch (Exception e) {
+                                    println "   Warning: Could not retrieve facilities for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                }
+                            }
+
+                            // Get Physical Office Locations/ Physician Group Name for this provider
+                            def officeLocations = []
+                            if (dr_Id && dr_Id != "NA") {
+                                try {
+                                    officeLocations = getOfficeLocations(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                } catch (Exception e) {
+                                    println "   Warning: Could not retrieve office locations for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                }
+                            }        
+
                             handler {
                                 uid                     providerData["Dr_Id"] ?: "NA"
                                 id                      providerData["Dr_Id"] ?: "NA"
@@ -122,13 +178,19 @@ switch (objectClass.objectClassValue)  {
                                 attribute 'Email',      providerData["Email"]
                                 attribute 'LastModifiedOn', providerData["LastModifiedOn"]
                                 attribute 'ProviderTypes_Id', providerData["ProviderTypes_Id"]
-                                attribute 'PrimaryTitles_Code' providerData["PrimaryTitles_Code"]
-                                attribute 'PrimaryHomeAddressLine1' providerData["PrimaryHomeAddressLine1"]
-                                attribute 'PrimaryHomeAddressLine2' providerData["PrimaryHomeAddressLine2"]
-                                attribute 'PrimaryHomeAddressCity' providerData["PrimaryHomeAddressCity"]
-                                attribute 'PrimaryHomeAddressState_Code' providerData["PrimaryHomeAddressState_Code"]
-                                attribute 'PrimaryHomeAddressZipcode' providerData["PrimaryHomeAddressZipcode"]
-                                attribute 'Fax'         providerData["Fax"]
+                                attribute 'PrimaryTitles_Code', providerData["PrimaryTitles_Code"]
+                                attribute 'PrimaryHomeAddressLine1', providerData["PrimaryHomeAddressLine1"]
+                                attribute 'PrimaryHomeAddressLine2', providerData["PrimaryHomeAddressLine2"]
+                                attribute 'PrimaryHomeAddressCity', providerData["PrimaryHomeAddressCity"]
+                                attribute 'PrimaryHomeAddressState_Code', providerData["PrimaryHomeAddressState_Code"]
+                                attribute 'PrimaryHomeAddressZipcode', providerData["PrimaryHomeAddressZipcode"]
+                                attribute 'Fax',         providerData["Fax"]
+                                attribute 'Gender',      providerData["Gender"]
+                                attribute 'associates', associates
+                                attribute 'licenses', licenses
+                                attribute 'specialities', specialities
+                                attribute 'officelocations', officeLocations
+                                attribute 'facilities', facilities
                             }
                         }
                     }
@@ -141,50 +203,60 @@ switch (objectClass.objectClassValue)  {
             }
             return new SearchResult()
         } else {
-            int pageSize = 0
+           
             int currentPage = 1
             String providerTypeId = "1"
             boolean hasMoreData = true
             int totalRecordsProcessed = 0
-            if(options.pageSize == null){
-                pageSize = constants.pageSize
-            } else {
-                pageSize = options.pageSize
+            int pageSize = constants.pageSize
+           
+            String currentPageCookie = null
+           
+            if(null != options.getPagedResultsOffset() && options.getPagedResultsOffset() > 0){
+                int offset = options.getPagedResultsOffset()
+                currentPage = (offset/pageSize) + 1
             }
-            println ("Page Size " + pageSize)
-            while (hasMoreData) {
-                // Create filter request JSON
-                def requestBody = null
-                try {
+            
+            if (null != options.pagedResultsCookie) {
+                currentPage = Integer.parseInt(options.pagedResultsCookie.toString())
+            } else {
+                println "No Cookie found"
+            }   
+           
+    
+            def requestBody = null
+            try {
                     requestBody = createDemographicsFilterRequest(currentPage, pageSize, providerTypeId)
-                } catch (Exception e){
-                    println "Error creating filter"
-                }
-                def jsonString = objectMapper.writeValueAsString(requestBody)
+            } catch (Exception e){
+                    e.printStackTrace
+            }
+            def jsonString = objectMapper.writeValueAsString(requestBody)
+            println "Filter "+ jsonString
 
-                def url = constants.apiBaseUrl + constants.demographicsFilterEndpoint
-                def request = new HttpPost(url)
+            def url = constants.apiBaseUrl + constants.demographicsFilterEndpoint
+            println "Provider URL "+url
+            def request = new HttpPost(url)
+            ensureJwtToken()
+            // Set headers
+            request.setHeader("Authorization", "Bearer " + jwtToken)
+            request.setHeader("Content-Type", "application/json")
+            request.setHeader("Accept", "application/json")
 
-                // Set headers
-                request.setHeader("Authorization", "Bearer " + jwtToken)
-                request.setHeader("Content-Type", "application/json")
-                request.setHeader("Accept", "application/json")
-
-                // Set request body
-                def entity = new StringEntity(jsonString, StandardCharsets.UTF_8)
-                request.setEntity(entity)
+            // Set request body
+            def entity = new StringEntity(jsonString, StandardCharsets.UTF_8)
+            request.setEntity(entity)
    
-                try {
+            try {
                     def response = httpClient.execute(request)
                     def responseEntity = response.getEntity()
                     def responseBody = EntityUtils.toString(responseEntity, StandardCharsets.UTF_8)
 
                     if (response.getStatusLine().getStatusCode() >= 200 &&
                             response.getStatusLine().getStatusCode() < 300) {
-
+                            
                         // Parse response to check for more data
                         def jsonResponse = objectMapper.readTree(responseBody)
-
+                        
                         // Check if response has the expected structure
                         def codeNode = jsonResponse.get("Code")
                         if (codeNode == null || codeNode.asInt() != 1000) {
@@ -204,17 +276,72 @@ switch (objectClass.objectClassValue)  {
                             if (paginationNode != null && resultNode != null && resultNode.isArray()) {
                                 int recordsInThisPage = resultNode.size()
                                 int totalRecords = paginationNode.has("TotalRecords") ? paginationNode.get("TotalRecords").asInt() : 0
+                                //println "Total Records "+totalRecords
                                 int currentPageFromResponse = paginationNode.has("Page") ? paginationNode.get("Page").asInt() : currentPage
                                 totalRecordsProcessed += recordsInThisPage
+                                //println "Total Records Processed "+ totalRecordsProcessed
                                 for (int i = 0; i < resultNode.size(); i++) {
                                     def provider = resultNode.get(i)
-                                    // Build a map of demographic attributes based on the schema definition.  This allows
-                                    // adding or removing fields in DemographicSchema without modifying this logic.
                                     Map<String, String> providerData = [:]
                                     for (String attrName : demographicSchema.providerAttributes) {
                                         // Check for existence of the field and convert to text; default to an empty string
-                                        providerData[attrName] = provider.has(attrName) ? provider.get(attrName).asText() : ""
+                                        //println "Attribute "+ attrName 
+                                        //println "Value " + provider.has(attrName) ? provider.get(attrName).asText() : "NA"
+                                        providerData[attrName] = provider.has(attrName) ? provider.get(attrName).asText() : "NA"
                                     }
+                                    def title = providerData["PrimaryTitles_Code"] ?: "NA"
+                                    def dr_Id = providerData["Dr_Id"] ?: "NA"
+                                    //println "Processing Dr_Id: " + dr_Id + ", Title: " + title
+                                    // Get affiliations, licenses, facilities, associates
+                    
+                                    def associates = []
+                                    if(title == "PA"){
+                                        try {
+                                            associates = getAssociates(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                        } catch (Exception e){
+                                            println "   Warning: Could not retrieve associates for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                        }
+                                    }
+                                    // Get licenses for this provider
+                                    def licenses = []
+                                    if (dr_Id && dr_Id != "NA") {
+                                        try {
+                                            licenses = getLicenses(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                        } catch (Exception e) {
+                                            println "   Warning: Could not retrieve licenses for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                        
+                                        }
+                                    }
+                                    // Get facilities for this provider
+                                    def facilities = []
+                                    if (dr_Id && dr_Id != "NA") {
+                                        try {
+                                            facilities = getFacilities(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                        } catch (Exception e) {
+        
+                                            println "   Warning: Could not retrieve facilities for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                        }
+                                    }
+                                    // Get specialities for this provider
+                                    def specialities = []
+                                    if (dr_Id && dr_Id != "NA") {
+                                        try {
+                                            specialities = getSpecialities(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                        } catch (Exception e) {
+                                            println "   Warning: Could not retrieve facilities for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                        }
+                                    }
+
+                                    // Get Physical Office Locations/ Physician Group Name for this provider
+                                    def officeLocations = []
+                                    if (dr_Id && dr_Id != "NA") {
+                                        try {
+                                             officeLocations = getOfficeLocations(httpClient,objectMapper,jwtToken,constants,dr_Id)
+                                        } catch (Exception e) {
+                                            println "   Warning: Could not retrieve office locations for Dr_Id ${dr_Id}: ${e.getMessage()}"
+                                        }
+                                    }    
+
                                     handler {
                                         uid                     providerData["Dr_Id"] ?: "NA"
                                         id                      providerData["Dr_Id"] ?: "NA"
@@ -225,32 +352,38 @@ switch (objectClass.objectClassValue)  {
                                         attribute 'Email',      providerData["Email"]
                                         attribute 'LastModifiedOn', providerData["LastModifiedOn"]
                                         attribute 'ProviderTypes_Id', providerData["ProviderTypes_Id"]
-                                        attribute 'PrimaryTitles_Code' providerData["PrimaryTitles_Code"]
-                                        attribute 'PrimaryHomeAddressLine1' providerData["PrimaryHomeAddressLine1"]
-                                        attribute 'PrimaryHomeAddressLine2' providerData["PrimaryHomeAddressLine2"]
-                                        attribute 'PrimaryHomeAddressCity' providerData["PrimaryHomeAddressCity"]
-                                        attribute 'PrimaryHomeAddressState_Code' providerData["PrimaryHomeAddressState_Code"]
-                                        attribute 'PrimaryHomeAddressZipcode' providerData["PrimaryHomeAddressZipcode"]
-                                        attribute 'Fax'         providerData["Fax"]
+                                        attribute 'PrimaryTitles_Code', providerData["PrimaryTitles_Code"]
+                                        attribute 'PrimaryHomeAddressLine1', providerData["PrimaryHomeAddressLine1"]
+                                        attribute 'PrimaryHomeAddressLine2', providerData["PrimaryHomeAddressLine2"]
+                                        attribute 'PrimaryHomeAddressCity', providerData["PrimaryHomeAddressCity"]
+                                        attribute 'PrimaryHomeAddressState_Code', providerData["PrimaryHomeAddressState_Code"]
+                                        attribute 'PrimaryHomeAddressZipcode', providerData["PrimaryHomeAddressZipcode"]
+                                        attribute 'Fax',         providerData["Fax"]
+                                        attribute 'Gender',      providerData["Gender"]
+                                        attribute 'associates', associates
+                                        attribute 'licenses', licenses
+                                        attribute 'specialities', specialities
+                                        attribute 'officelocations', officeLocations
+                                        attribute 'facilities', facilities
                                     }
                                 }
                                 // Check if we've processed all available records
                                 if (totalRecordsProcessed >= totalRecords) {
-                                    hasMoreData = false
+                                    //println "Done"
+                                    return new SearchResult()
                                 } else {
                                     currentPage++
+                                    //println "Current Page after rows " + currentPage
+                                    return new SearchResult(currentPage.toString(),-1)
                                 }
-                            } else {
-                                hasMoreData = false
-                            }
-                        } else {
-                            hasMoreData = false
+                               
+                            } 
                         }
                     }
                 } catch (Exception e){
                     e.printStackTrace()
                 }
-            }
+            //}
             return new SearchResult()
         }
         break
@@ -321,12 +454,12 @@ def ensureJwtToken() {
 }
 
 def getAffiliations(CloseableHttpClient httpClient, ObjectMapper objectMapper, String token, CStreamConstants constants, String drId) throws IOException {
-    ensureJwtToken()
+    //ensureJwtToken()
     affiliationsService = new Affiliations(httpClient,objectMapper,constants)
     return affiliationsService.getAffiliations(drId, token)
 }
 def getLicenses(CloseableHttpClient httpClient, ObjectMapper objectMapper, String token, CStreamConstants constants,String drId) throws IOException {
-    ensureJwtToken()
+    //ensureJwtToken()
     licensesService = new Licenses(httpClient,objectMapper,constants)
     return licensesService.getLicenses(drId, token)
 }
@@ -335,6 +468,25 @@ def getFacilities(CloseableHttpClient httpClient, ObjectMapper objectMapper, Str
     //ensureJwtToken()
     facilitiesService = new Facilities(httpClient,objectMapper,constants)
     return facilitiesService.getFacilities(drId, token)
+}
+
+def getAssociates(CloseableHttpClient httpClient, ObjectMapper objectMapper, String token, CStreamConstants constants,String drId) throws IOException {
+    //ensureJwtToken()
+    //println "Getting Associates for Dr_Id: " + drId
+    approvedAssociatesService = new ApprovedAssociates(httpClient,objectMapper,constants)
+    return approvedAssociatesService.getSupervisingPhysicians(drId, token)
+}
+
+def getSpecialities(CloseableHttpClient httpClient, ObjectMapper objectMapper, String token, CStreamConstants constants,String drId) throws IOException {
+    //ensureJwtToken()
+   specialitiesService = new Specialities(httpClient,objectMapper,constants)
+    return specialitiesService.getSpecialities(drId, token)
+}
+
+def getOfficeLocations(CloseableHttpClient httpClient, ObjectMapper objectMapper, String token, CStreamConstants constants,String drId) throws IOException {
+    //ensureJwtToken()
+   officeLocationsService = new OfficeLocations(httpClient,objectMapper,constants)
+   return officeLocationsService. getOfficeLocations(drId, token)
 }
 
 def ObjectNode createDemographicsFilterRequest(int page, int pageSize, String providerTypeId) {

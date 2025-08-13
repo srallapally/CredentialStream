@@ -1,20 +1,18 @@
 package org.tampagen.utils
 
 /**
- * Encapsulates all URL constants used throughout the CStream application.
+ * CStreamConstants.groovy
+ * This class contains constants used throughout the CredentialStream application.
+ * It includes API endpoints, page size, and other configuration values.
  *
- * The original CStream.groovy defined several static final strings for
- * endpoints and base URLs. To eliminate static fields and centralize
- * configuration, those values have been moved into this class. Each field
- * is an instance field rather than static to conform to the requirement
- * of avoiding static members. Consumers of these constants should
- * instantiate this class and access its properties.
+ * @author Sanjay Rallapally
+ * @version 1.0
  */
 public class CStreamConstants {
 
     CStreamConstants(){}
 
-    /**
+        /**
      * Page Size
      */
     final int pageSize = 50
@@ -57,4 +55,28 @@ public class CStreamConstants {
      */
     final String affiliationsEndpoint =
             "/services/verityconnect/api/core/v1/Demographic/Affiliation/Filter"
+
+    /**
+     * Endpoint for retrieving Specialities data for a provider.
+     */
+    final String specialitiesEndpoint =
+            "/services/verityconnect/api/core/v1/Demographic/Specialties/Filter"
+
+    /**
+    * Endpoint for retrieving Approved Associates data for a provider.
+    */
+    final String approvedAssociatesEndpoint =
+            "/services/verityconnect/api/core/v1/Demographic/ApprovedAssociates/Filter"
+
+   /**
+    * Endpoint for retrieving Office Locations data for a provider.
+    */
+    final String officeLocationsEndpoint =
+            "/services/verityconnect/api/core/v1/Demographic/OfficesLocations/Filter"
+
+   /**
+    * Endpoint for retrieving Locations data for a location.
+    */
+    final String locationsEndpoint =
+            "/services/verityconnect/api/core/v1/lookup/locations/find"
 }

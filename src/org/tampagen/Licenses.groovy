@@ -1,4 +1,12 @@
 package org.tampagen
+/**
+ * Licenses.groovy
+ * Service class responsible for retrieving licenses information for a
+ * provider. 
+ * 
+ * @author Sanjay Rallapally
+ * @version 1.0
+ */
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -11,16 +19,7 @@ import java.nio.charset.StandardCharsets
 
 import org.tampagen.utils.CStreamConstants
 
-/**
- * Provides functionality to retrieve license information for a provider.
- *
- * This class encapsulates the API call that fetches credentials and licenses
- * for a given Dr_Id. The logic originally resided inside VerityStreamApiClient.
- * It has been extracted here to keep the client focused on higher level
- * orchestration. The class accepts required dependencies via its constructor
- * rather than relying on static members. Callers must ensure that the
- * JWT token used for authorization is valid prior to invoking getLicenses.
- */
+
 class Licenses {
     private final CloseableHttpClient httpClient
     private final ObjectMapper objectMapper
@@ -180,7 +179,7 @@ class Licenses {
         def vCertFilter = objectMapper.createObjectNode()
         vCertFilter.put("Field", "Type_Code")
         vCertFilter.put("Operator", "EQUALS")
-        vCertFilter.put("Value", "vCERT")
+        vCertFilter.put("Value", "vSL")
         typeCodeFilters.add(vCertFilter)
 
         // vDEA filter

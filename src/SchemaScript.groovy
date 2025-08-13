@@ -16,12 +16,12 @@ return builder.schema({
     objectClass {
         type ObjectClass.ACCOUNT_NAME
         attributes {
-            "FirstName" String.class, REQUIRED
-            "LastName" String.class, REQUIRED
-            "NPI" String.class
-            "Dr_Id" String.class, REQUIRED
-            "ExternalId" String.class, REQUIRED
-            "Email" String.class, REQUIRED
+            "FirstName"     String.class, REQUIRED
+            "LastName"      String.class, REQUIRED
+            "NPI"           String.class
+            "Dr_Id"         String.class, REQUIRED
+            "ExternalId"    String.class, REQUIRED
+            "Email"         String.class, REQUIRED
             "LastModifiedOn" String.class
             "ProviderTypes_Id" String.class, REQUIRED
             "PrimaryTitles_Code" String.class
@@ -30,10 +30,14 @@ return builder.schema({
             "PrimaryHomeAddressCity" String.class
             "PrimaryHomeAddressState_Code" String.class
             "PrimaryHomeAddressZipcode" String.class
-            "Fax" String.class
-            facilities Map.class, MULTIVALUED
-            affiliations Map.class, MULTIVALUED
-            licenses Map.class, MULTIVALUED
+            "Fax"                       String.class
+            "Gender"                    String.class
+            "facilities"                  Map.class, MULTIVALUED
+            "affiliations"                Map.class, MULTIVALUED
+            "licenses"                    Map.class, MULTIVALUED
+            "associates"                  String.class, MULTIVALUED
+            "specialities"                String.class, MULTIVALUED     
+            "officeLocations"             String.class, MULTIVALUED   
         }
 
     }

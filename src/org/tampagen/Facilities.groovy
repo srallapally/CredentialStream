@@ -1,5 +1,12 @@
 package org.tampagen
-
+/**
+ * Facilities.groovy
+ * Service class responsible for retrieving facilities information for a
+ * provider.
+ * 
+ * @author Sanjay Rallapally
+ * @version 1.0
+ */
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.http.client.methods.HttpPost
@@ -11,15 +18,6 @@ import java.nio.charset.StandardCharsets
 
 import org.tampagen.utils.CStreamConstants
 
-/**
- * Provides functionality to retrieve facility information for a provider.
- *
- * The logic originally existed inside VerityStreamApiClient#getFacilities and
- * createFacilitiesFilterRequest. It has been extracted into this class
- * so that facility-related operations are encapsulated in one place.
- * Consumers must supply a valid JWT token at call time; this class does
- * not manage token life cycle.
- */
 class Facilities {
     private final CloseableHttpClient httpClient
     private final ObjectMapper objectMapper

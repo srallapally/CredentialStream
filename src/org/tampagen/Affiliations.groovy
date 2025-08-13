@@ -1,5 +1,13 @@
 package org.tampagen
 
+/**
+ * Affiliations.groovy
+ * Service class responsible for retrieving affiliation information for a
+ * provider.
+ * 
+ * @author Sanjay Rallapally
+ * @version 1.0
+ */
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.http.client.methods.HttpPost
@@ -11,12 +19,7 @@ import org.tampagen.utils.DemographicSchema
 
 import java.nio.charset.StandardCharsets
 
-/**
- * Service class responsible for retrieving affiliation information for a
- * provider.  Similar in structure to the Licenses and Facilities
- * services, this class encapsulates the filter request and parsing
- * logic for the affiliations endpoint.
- */
+
 class Affiliations {
 
     private final CloseableHttpClient httpClient
@@ -94,13 +97,6 @@ class Affiliations {
                         affiliationData.each { key, value ->
                             affiliationData[key] = affiliation.has(key) ? affiliation.get(key).asText() : null
                         }
-                        /*
-                        affiliationData["Id"] = affiliation.has("Id") ? affiliation.get("Id").asText() : null
-                        affiliationData["Type_Code"] = affiliation.has("Type_Code") ? affiliation.get("Type_Code").asText() : null
-                        affiliationData["Specialty_Code"] = affiliation.has("Specialty_Code") ? affiliation.get("Specialty_Code").asText() : null
-                        affiliationData["Institution_Code"] = affiliation.has("Institution_Code") ? affiliation.get("Institution_Code").asText() : null
-                        affiliationData["Position_Code"] = affiliation.has("Position_Code") ? affiliation.get("Position_Code").asText() : null
-                        */
                         affiliations.add(affiliationData)
 
                     }

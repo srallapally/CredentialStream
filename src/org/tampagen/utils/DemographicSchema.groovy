@@ -3,10 +3,9 @@ package org.tampagen.utils
 /**
  * Defines the list of demographic attributes that should be extracted
  * for each provider record when processing the demographics endpoint.
- *
- * This class provides an instance-level list of attribute names instead
- * of hard-coding them in the main client. New attributes can be added
- * to this list without modifying the extraction logic in CStream.groovy.
+ * 
+ * @author Sanjay Rallapally
+ * @version 1.0
  */
 class DemographicSchema {
 
@@ -17,11 +16,11 @@ class DemographicSchema {
      */
     final List<String> providerAttributes
     final List<String> affiliationAttributes
-
+    final List<String> specialitiesAttributes
+    final List<String> officeLocationsAttributes
+    
     DemographicSchema() {
-        // Initialize the list with the attribute names. This list can
-        // easily be modified to include additional demographic fields
-        // without touching the extraction logic in VerityStreamApiClient.
+
         this.providerAttributes = [
                 "FirstName",
                 "LastName",
@@ -37,7 +36,8 @@ class DemographicSchema {
                 "PrimaryHomeAddressCity",
                 "PrimaryHomeAddressState_Code",
                 "PrimaryHomeAddressZipcode",
-                "Fax"
+                "Fax",
+                "Gender"
         ]
         this.affiliationAttributes = [
                 "Id",
