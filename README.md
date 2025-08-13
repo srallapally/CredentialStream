@@ -1,3 +1,4 @@
+<pre>
 Deployment Instructions for Ping AIC
 **1. Create a folder in RCS as shown below**
 CredentialStream
@@ -30,3 +31,4 @@ resource = "<RESOURCE>"
 **Define a Scripted Groovy Authoritative App**
 Select the RCS (in case you have multiple)
 Specify the file paths
+</pre>
